@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Kalit so'zlar ro'yxati
+# Kalit so'zlar
 KEYWORDS = [
     "suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "электр",
     "chiqindi", "чиқинди", "axlat", "ахлат", "mahalla", "маҳалла",
@@ -21,22 +21,15 @@ KEYWORDS = [
 
 @dp.message(F.text)
 async def monitor_pro(message: types.Message):
-    # Faqat guruhlarda ishlashi uchun
     if message.chat.type in ['group', 'supergroup']:
         text_lower = message.text.lower()
-        
-        # Kalit so'zlarni tekshirish
         if any(word in text_lower for word in KEYWORDS):
-            # Vaqtni olish (O'zbekiston vaqti)
             vakt = datetime.now().strftime("%H:%M:%S")
-            
-            # Foydalanuvchi ma'lumotlari
             f_name = message.from_user.full_name
             u_id = message.from_user.id
             u_username = f"@{message.from_user.username}" if message.from_user.username else "yo'q"
             g_name = message.chat.title
 
-            # Chiroyli hisobot matni (HTML formati)
             report = (
                 f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
                 f"━━━━━━━━━━━━━━━\n\n"
@@ -51,15 +44,14 @@ async def monitor_pro(message: types.Message):
             )
             
             try:
-                # Adminga yuborish
                 await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
             except Exception as e:
-                logging.error(f"Xatolik yuz berdi: {e}")
+                logging.error(f"Xatolik: {e}")
 
 async def main():
     print("Bot Render-da muvaffaqiyatli ishga tushdi...")
     await dp.start_polling(bot)
 
-# XATO SHU YERDA EDI - ENDI TO'G'IRLANDI:
-if "name" == "main":
+# ASOSIY TO'G'IRLASH SHU YERDA (Ikkita pastki chiziq shart):
+if name == "main":
     asyncio.run(main())
