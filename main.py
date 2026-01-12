@@ -53,5 +53,5 @@ async def main():
     await dp.start_polling(bot)
 
 # ASOSIY TO'G'IRLASH SHU YERDA (Ikkita pastki chiziq shart):
-if name == "main":
+if _name_ == "_main_":
     asyncio.run(main())
