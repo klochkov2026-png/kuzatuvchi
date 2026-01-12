@@ -61,5 +61,5 @@ async def main():
     await dp.start_polling(bot)
 
 # XATO SHU YERDA EDI - ENDI TO'G'IRLANDI:
-if name == "main":
+if "name" == "main":
     asyncio.run(main())
