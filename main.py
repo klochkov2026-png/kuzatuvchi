@@ -19,7 +19,8 @@ KEYWORDS = ["suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "э�
 @dp.message(F.text)
 async def monitor(message: types.Message):
     if message.chat.type in ['group', 'supergroup']:
-        if any(word in message.text.lower() for word in KEYWORDS):
+        text_lower = message.text.lower()
+        if any(word in text_lower for word in KEYWORDS):
             # O'zbekiston vaqtini sozlash
             toshkent_vakti = pytz.timezone('Asia/Tashkent')
             vakt = datetime.now(toshkent_vakti).strftime("%H:%M:%S")
@@ -38,10 +39,15 @@ async def monitor(message: types.Message):
                 f"<blockquote>{message.text}</blockquote>\n"
                 f"━━━━━━━━━━━━━━━"
             )
-            await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
+            try:
+                await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
+            except Exception as e:
+                logging.error(f"Yuborishda xato: {e}")
 
 async def main():
-    print("Bot Toshkent vaqti bilan ishga tushdi!")
+    # Eski ulanishlarni o'chirib yuborish (Conflict xatosini oldini olish uchun)
+    await bot.delete_webhook(drop_pending_updates=True)
+    print("Bot Toshkent vaqti bilan Render-da ishga tushdi!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
