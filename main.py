@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
+import pytz  # Vaqt mintaqasi uchun
 from aiogram import Bot, Dispatcher, types, F
 
 # MA'LUMOTLAR
@@ -12,46 +14,35 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # Kalit so'zlar
-KEYWORDS = [
-    "suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "электр",
-    "chiqindi", "чиқинди", "axlat", "ахлат", "mahalla", "маҳалла",
-    "hokimiyat", "хокимият", "xokimiyat", "ҳокимият", "diniy", "диний",
-    "muammo", "муаммо", "shikoyat", "шикоят", "adminga", "админга"
-]
+KEYWORDS = ["suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "электр", "chiqindi", "чиқинди", "mahalla", "маҳалла", "hokimiyat", "ҳокимият", "diniy", "диний", "muammo", "муаммо", "shikoyat", "шикоят", "adminga", "админга"]
 
 @dp.message(F.text)
-async def monitor_pro(message: types.Message):
+async def monitor(message: types.Message):
     if message.chat.type in ['group', 'supergroup']:
-        text_lower = message.text.lower()
-        if any(word in text_lower for word in KEYWORDS):
-            vakt = datetime.now().strftime("%H:%M:%S")
-            f_name = message.from_user.full_name
-            u_id = message.from_user.id
-            u_username = f"@{message.from_user.username}" if message.from_user.username else "yo'q"
-            g_name = message.chat.title
+        if any(word in message.text.lower() for word in KEYWORDS):
+            # O'zbekiston vaqtini sozlash
+            toshkent_vakti = pytz.timezone('Asia/Tashkent')
+            vakt = datetime.now(toshkent_vakti).strftime("%H:%M:%S")
+            sana = datetime.now(toshkent_vakti).strftime("%d.%m.%Y")
 
             report = (
                 f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
                 f"━━━━━━━━━━━━━━━\n\n"
+                f"📅 <b>Sana:</b> {sana}\n"
                 f"⏰ <b>Vaqt:</b> {vakt}\n"
-                f"🏢 <b>Guruh:</b> {g_name}\n"
-                f"👤 <b>Kimdan:</b> {f_name}\n"
-                f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
-                f"🔗 <b>Username:</b> {u_username}\n\n"
+                f"🏢 <b>Guruh:</b> {message.chat.title}\n"
+                f"👤 <b>Kimdan:</b> {message.from_user.full_name}\n"
+                f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n"
+                f"🔗 <b>Username:</b> @{message.from_user.username if message.from_user.username else 'yoq'}\n\n"
                 f"💬 <b>Xabar:</b>\n"
                 f"<blockquote>{message.text}</blockquote>\n"
                 f"━━━━━━━━━━━━━━━"
             )
-            
-            try:
-                await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
-            except Exception as e:
-                logging.error(f"Xatolik: {e}")
+            await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
 
 async def main():
-    print("Bot Render-da muvaffaqiyatli ishga tushdi...")
+    print("Bot Toshkent vaqti bilan ishga tushdi!")
     await dp.start_polling(bot)
 
-# ASOSIY TO'G'IRLASH SHU YERDA (Ikkita pastki chiziq shart):
 if __name__ == "__main__":
     asyncio.run(main())
