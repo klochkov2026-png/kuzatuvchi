@@ -1,8 +1,7 @@
 import asyncio
 import logging
-import os
 from datetime import datetime
-import pytz  # Vaqt mintaqasi uchun
+import pytz  # VAQT UCHUN KERAK
 from aiogram import Bot, Dispatcher, types, F
 
 # MA'LUMOTLAR
@@ -19,8 +18,7 @@ KEYWORDS = ["suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "э�
 @dp.message(F.text)
 async def monitor(message: types.Message):
     if message.chat.type in ['group', 'supergroup']:
-        text_lower = message.text.lower()
-        if any(word in text_lower for word in KEYWORDS):
+        if any(word in message.text.lower() for word in KEYWORDS):
             # O'zbekiston vaqtini sozlash
             toshkent_vakti = pytz.timezone('Asia/Tashkent')
             vakt = datetime.now(toshkent_vakti).strftime("%H:%M:%S")
@@ -42,10 +40,10 @@ async def monitor(message: types.Message):
             try:
                 await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
             except Exception as e:
-                logging.error(f"Yuborishda xato: {e}")
+                logging.error(f"Xato: {e}")
 
 async def main():
-    # Eski ulanishlarni o'chirib yuborish (Conflict xatosini oldini olish uchun)
+    # MUHIM: Konfliktni yo'qotish uchun eski ulanishni majburan uzamiz
     await bot.delete_webhook(drop_pending_updates=True)
     print("Bot Toshkent vaqti bilan Render-da ishga tushdi!")
     await dp.start_polling(bot)
