@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
-import pytz  # VAQT UCHUN KERAK
+import pytz
 from aiogram import Bot, Dispatcher, types, F
+from aiohttp import web
 
 # MA'LUMOTLAR
 TOKEN = "8361596312:AAHPJiFL1iDnDkJ8cZzdxV9a34Au10ibiNo"
@@ -12,40 +14,41 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Kalit so'zlar
+# Render-da uxlab qolmaslik va PORT xatosini yo'qotish uchun veb-server
+async def handle(request):
+    return web.Response(text="Bot ishlayapti!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
 KEYWORDS = ["suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "электр", "chiqindi", "чиқинди", "mahalla", "маҳалла", "hokimiyat", "ҳокимият", "diniy", "диний", "muammo", "муаммо", "shikoyat", "шикоят", "adminga", "админга"]
 
 @dp.message(F.text)
 async def monitor(message: types.Message):
     if message.chat.type in ['group', 'supergroup']:
         if any(word in message.text.lower() for word in KEYWORDS):
-            # O'zbekiston vaqtini sozlash
-            toshkent_vakti = pytz.timezone('Asia/Tashkent')
-            vakt = datetime.now(toshkent_vakti).strftime("%H:%M:%S")
-            sana = datetime.now(toshkent_vakti).strftime("%d.%m.%Y")
-
+            uz_tz = pytz.timezone('Asia/Tashkent')
+            vakt = datetime.now(uz_tz).strftime("%H:%M:%S")
+            sana = datetime.now(uz_tz).strftime("%d.%m.%Y")
             report = (
-                f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
-                f"━━━━━━━━━━━━━━━\n\n"
-                f"📅 <b>Sana:</b> {sana}\n"
-                f"⏰ <b>Vaqt:</b> {vakt}\n"
-                f"🏢 <b>Guruh:</b> {message.chat.title}\n"
-                f"👤 <b>Kimdan:</b> {message.from_user.full_name}\n"
-                f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n"
-                f"🔗 <b>Username:</b> @{message.from_user.username if message.from_user.username else 'yoq'}\n\n"
-                f"💬 <b>Xabar:</b>\n"
-                f"<blockquote>{message.text}</blockquote>\n"
-                f"━━━━━━━━━━━━━━━"
+                f"📝 <b>YANGI MUROJAAT</b>\n"
+                f"📅 Sana: {sana}\n"
+                f"⏰ Vaqt: {vakt}\n"
+                f"🏢 Guruh: {message.chat.title}\n"
+                f"👤 Kimdan: {message.from_user.full_name}\n"
+                f"💬 Xabar: <blockquote>{message.text}</blockquote>"
             )
-            try:
-                await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
-            except Exception as e:
-                logging.error(f"Xato: {e}")
+            await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
 
 async def main():
-    # MUHIM: Konfliktni yo'qotish uchun eski ulanishni majburan uzamiz
-    await bot.delete_webhook(drop_pending_updates=True)
-    print("Bot Toshkent vaqti bilan Render-da ishga tushdi!")
+    asyncio.create_task(start_web_server()) # Serverni ishga tushirish
+    await bot.delete_webhook(drop_pending_updates=True) # Konfliktni tozalash
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
