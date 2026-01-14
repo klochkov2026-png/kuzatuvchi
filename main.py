@@ -9,7 +9,7 @@ from aiohttp import web
 
 # Ma'lumotlar
 API_TOKEN = '8361596312:AAEno_t8e5eN__bTkKCDcE7GseSrhYWh9cQ'
-ADMIN_ID = 7759817899
+ADMIN_ID = 8319486490
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
