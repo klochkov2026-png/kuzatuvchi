@@ -1,55 +1,63 @@
-import asyncio
 import logging
-import os
+from aiogram import Bot, Dispatcher, executor, types
 from datetime import datetime
-import pytz
-from aiogram import Bot, Dispatcher, types, F
-from aiohttp import web
 
-# MA'LUMOTLAR
-TOKEN = "8361596312:AAHPJiFL1iDnDkJ8cZzdxV9a34Au10ibiNo"
-ADMIN_ID = 7759817899
+# Bot tokeningizni shu yerga yozing
+API_TOKEN = 'TOKEN_SHU_YERGA_YOZILADI'
 
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
+dp = Dispatcher(bot)
 
-# Render-da uxlab qolmaslik va PORT xatosini yo'qotish uchun veb-server
-async def handle(request):
-    return web.Response(text="Bot ishlayapti!")
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-
-KEYWORDS = ["suv", "сув", "gaz", "газ", "svet", "свет", "elektr", "электр", "chiqindi", "чиқинди", "mahalla", "маҳалла", "hokimiyat", "ҳокимият", "diniy", "диний", "muammo", "муаммо", "shikoyat", "шикоят", "adminga", "админга"]
-
-@dp.message(F.text)
-async def monitor(message: types.Message):
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def handle_all_messages(message: types.Message):
+    now = datetime.now()
+    sana = now.strftime("%d.%m.%Y")
+    vaqt = now.strftime("%H:%M:%S")
+    
+    # Ma'lumotlarni yig'ish
+    ism = message.from_user.full_name
+    user_id = message.from_user.id
+    username = f"@{message.from_user.username}" if message.from_user.username else "Mavjud emas"
+    xabar_matni = message.text if message.text else "[Media xabar]"
+    
+    # Guruh va xabar havolasini yasash
     if message.chat.type in ['group', 'supergroup']:
-        if any(word in message.text.lower() for word in KEYWORDS):
-            uz_tz = pytz.timezone('Asia/Tashkent')
-            vakt = datetime.now(uz_tz).strftime("%H:%M:%S")
-            sana = datetime.now(uz_tz).strftime("%d.%m.%Y")
-            report = (
-                f"📝 <b>YANGI MUROJAAT</b>\n"
-                f"📅 Sana: {sana}\n"
-                f"⏰ Vaqt: {vakt}\n"
-                f"🏢 Guruh: {message.chat.title}\n"
-                f"👤 Kimdan: {message.from_user.full_name}\n"
-                f"💬 Xabar: <blockquote>{message.text}</blockquote>"
-            )
-            await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
+        guruh_nomi = message.chat.title
+        # Chat ID'dan -100 ni olib tashlash kerak (havola uchun)
+        chat_id_short = str(message.chat.id).replace("-100", "")
+        # Xabarga to'g'ridan-to'g'ri havola
+        msg_link = f"https://t.me/c/{chat_id_short}/{message.message_id}"
+    else:
+        guruh_nomi = "Shaxsiy chat"
+        msg_link = None
 
-async def main():
-    asyncio.create_task(start_web_server()) # Serverni ishga tushirish
-    await bot.delete_webhook(drop_pending_updates=True) # Konfliktni tozalash
-    await dp.start_polling(bot)
+    # Formatlangan xabar
+    formatlangan_xabar = (
+        f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"📅 <b>Sana:</b> {sana}\n"
+        f"⏰ <b>Vaqt:</b> {vaqt}\n"
+        f"🏢 <b>Guruh:</b> {guruh_nomi}\n"
+        f"👤 <b>Kimdan:</b> {ism}\n"
+        f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+        f"🔗 <b>Username:</b> {username}\n\n"
+        f"💬 <b>Xabar:</b>\n"
+        f"« <i>{xabar_matni}</i> »\n\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Inline tugma yaratish (Xabarga o'tish uchun)
+    keyboard = types.InlineKeyboardMarkup()
+    if msg_link:
+        url_button = types.InlineKeyboardButton(text="Original xabarga o'tish ↗️", url=msg_link)
+        keyboard.add(url_button)
+
+    # Admin ID ni kiriting (o'zingizning ID raqamingiz)
+    # await bot.send_message(ADMIN_ID, formatlangan_xabar, reply_markup=keyboard)
+    
+    # Hozircha xabarni o'sha joyning o'ziga yuboramiz (tekshirish uchun)
+    await message.answer(formatlangan_xabar, reply_markup=keyboard)
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
