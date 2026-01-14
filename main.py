@@ -1,83 +1,87 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
+import pytz  # Vaqt mintaqasi uchun
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiohttp import web
 
-# Bot ma'lumotlari
+# Ma'lumotlar
 API_TOKEN = '8361596312:AAEno_t8e5eN__bTkKCDcE7GseSrhYWh9cQ'
 ADMIN_ID = 7759817899
 
-# Loglarni sozlash
 logging.basicConfig(level=logging.INFO)
-
-# Bot va Dispatcherni ishga tushirish
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
+# Render port xatosi uchun server
+async def handle_render(request):
+    return web.Response(text="Aloqachi Bot is active!")
+
 @dp.message()
-async def handle_incoming_messages(message: types.Message):
-    # Hozirgi vaqt va sanani olish
-    now = datetime.now()
+async def handle_messages(message: types.Message):
+    # O'zbekiston vaqtini olish
+    uzb_tz = pytz.timezone('Asia/Tashkent')
+    now = datetime.now(uzb_tz)
     sana = now.strftime("%d.%m.%Y")
     vaqt = now.strftime("%H:%M:%S")
     
     # Ma'lumotlarni yig'ish
     ism = message.from_user.full_name
     u_id = message.from_user.id
-    username = f"@{message.from_user.username}" if message.from_user.username else "Mavjud emas"
-    xabar_matni = message.text if message.text else "[Media xabar]"
-    
-    # Havola yasash (Guruhlar uchun)
+    username = f"@{message.from_user.username}" if message.from_user.username else "mavjud emas"
+    xabar_matni = message.text if message.text else "[Media/Fayl]"
+    guruh_nomi = message.chat.title if message.chat.type != 'private' else "Shaxsiy chat 👤"
+
+    # Xabar havolasini yasash
     msg_link = None
-    guruh_nomi = "Shaxsiy chat"
-    
-    if message.chat.type in ['group', 'supergroup']:
-        guruh_nomi = message.chat.title
+    if message.chat.type != 'private':
         chat_id_short = str(message.chat.id).replace("-100", "")
         msg_link = f"https://t.me/c/{chat_id_short}/{message.message_id}"
 
-    # Rasmda ko'rsatilgan format
-    formatlangan_xabar = (
-        f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
-        f"────────────────────\n\n"
-        f"📅 <b>Sana:</b> {sana}\n"
-        f"⏰ <b>Vaqt:</b> {vaqt}\n"
-        f"🏢 <b>Guruh:</b> {guruh_nomi}\n"
-        f"👤 <b>Kimdan:</b> {ism}\n"
+    # Yanada chiroyliroq va zamonaviy dizayn
+    dizaynli_xabar = (
+        f"🌟 <b>YANGI MUROJAAT</b> 🌟\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"📅 <b>Sana:</b> <code>{sana}</code>\n"
+        f"⏰ <b>Vaqt:</b> <code>{vaqt}</code> (Tashkent)\n"
+        f"🏢 <b>Manba:</b> <i>{guruh_nomi}</i>\n\n"
+        f"👤 <b>Yuboruvchi:</b> {ism}\n"
         f"🆔 <b>ID:</b> <code>{u_id}</code>\n"
         f"🔗 <b>Username:</b> {username}\n\n"
-        f"💬 <b>Xabar:</b>\n"
-        f"« <i>{xabar_matni}</i> »\n\n"
-        f"────────────────────"
+        f"💬 <b>Xabar mazmuni:</b>\n"
+        f"« <b>{xabar_matni}</b> »\n\n"
+        f"━━━━━━━━━━━━━━━━━━"
     )
 
-    # Inline tugma
-    keyboard = None
+    # Tugma (faqat guruh xabarlari uchun)
+    kb = None
     if msg_link:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Guruhdagi xabarga o'tish ↗️", url=msg_link)]
-        ])
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="Xabarga o'tish ↗️", url=msg_link)
+        ]])
 
-    # Xabarni Adminga yuborish
     try:
-        await bot.send_message(
-            chat_id=ADMIN_ID, 
-            text=formatlangan_xabar, 
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
+        await bot.send_message(chat_id=ADMIN_ID, text=dizaynli_xabar, reply_markup=kb, parse_mode="HTML")
     except Exception as e:
-        logging.error(f"Xatolik yuz berdi: {e}")
+        logging.error(f"Xatolik: {e}")
 
 async def main():
-    # Eski sessionlarni tozalash (Conflict xatosini oldini olish uchun)
+    # Eski conflictlarni tozalash
     await bot.delete_webhook(drop_pending_updates=True)
-    print("Bot yangi token bilan ishga tushdi...")
+    
+    # Render uchun portni sozlash
+    app = web.Application()
+    app.router.add_get("/", handle_render)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    asyncio.create_task(site.start())
+
+    print(f"Bot ishga tushdi! Port: {port}")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logging.info("Bot to'xtatildi")
+    asyncio.run(main())
