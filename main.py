@@ -1,23 +1,23 @@
+import asyncio
 import logging
-from aiogram import Bot, Dispatcher, executor, types
 from datetime import datetime
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Bot ma'lumotlari
 API_TOKEN = '8361596312:AAHPJiFL1iDnDkJ8cZzdxV9a34Au10ibiNo'
-ADMIN_ID = 7759817899  # Sizning ID raqamingiz
+ADMIN_ID = 7759817899
 
 # Loglarni sozlash
 logging.basicConfig(level=logging.INFO)
 
-# Bot va Dispatcherni ishga tushirish
-bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
-dp = Dispatcher(bot)
+# Bot va Dispatcherni ishga tushirish (aiogram 3.x)
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
 
-@dp.message_handler(content_types=types.ContentTypes.ANY)
+@dp.message(F.text)
 async def handle_incoming_messages(message: types.Message):
-    # Faqat guruhlardan kelgan xabarlarni tutib olish (yoki hammasini)
-    # Agar bot guruhda bo'lsa va sizga yuborishi kerak bo'lsa:
-    
+    # Hozirgi vaqt va sanani olish
     now = datetime.now()
     sana = now.strftime("%d.%m.%Y")
     vaqt = now.strftime("%H:%M:%S")
@@ -26,7 +26,7 @@ async def handle_incoming_messages(message: types.Message):
     ism = message.from_user.full_name
     u_id = message.from_user.id
     username = f"@{message.from_user.username}" if message.from_user.username else "Mavjud emas"
-    xabar_matni = message.text if message.text else "[Media xabar/Rasm]"
+    xabar_matni = message.text
     
     # Havola yasash (Guruhlar uchun)
     msg_link = None
@@ -37,7 +37,7 @@ async def handle_incoming_messages(message: types.Message):
         chat_id_short = str(message.chat.id).replace("-100", "")
         msg_link = f"https://t.me/c/{chat_id_short}/{message.message_id}"
 
-    # Rasmga asoslangan dizayn
+    # Rasmda hohlagan dizayningiz (HTML formatida)
     formatlangan_xabar = (
         f"📝 <b>YANGI MUROJAAT</b> 🚨\n"
         f"────────────────────\n\n"
@@ -53,17 +53,29 @@ async def handle_incoming_messages(message: types.Message):
     )
 
     # Inline tugma
-    keyboard = types.InlineKeyboardMarkup()
+    keyboard = None
     if msg_link:
-        url_button = types.InlineKeyboardButton(text="Guruhdagi xabarga o'tish ↗️", url=msg_link)
-        keyboard.add(url_button)
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Guruhdagi xabarga o'tish ↗️", url=msg_link)]
+        ])
 
-    # Xabarni faqat sizga (Adminga) yuborish
+    # Xabarni Adminga yuborish
     try:
-        await bot.send_message(chat_id=ADMIN_ID, text=formatlangan_xabar, reply_markup=keyboard)
+        await bot.send_message(
+            chat_id=ADMIN_ID, 
+            text=formatlangan_xabar, 
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     except Exception as e:
-        logging.error(f"Xabar yuborishda xatolik: {e}")
+        logging.error(f"Xatolik: {e}")
+
+async def main():
+    print("Bot ishga tushdi (aiogram 3.x)...")
+    await dp.start_polling(bot)
 
 if __name__ == '__main__':
-    print("Bot muvaffaqiyatli ishga tushdi...")
-    executor.start_polling(dp, skip_updates=True)
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Bot to'xtatildi")
