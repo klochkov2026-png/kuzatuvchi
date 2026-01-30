@@ -1,0 +1,132 @@
+import asyncio
+import logging
+import os
+import pytz
+import re
+import sqlite3
+from datetime import datetime
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command, ChatMemberUpdatedFilter
+from aiogram.types import ChatMemberUpdated
+from aiohttp import web
+
+# --- KONFIGURATSIYA ---
+API_TOKEN = '8361596312:AAEno_t8e5eN__bTkKCDcE7GseSrhYWh9cQ'
+ADMINS = [8319486490, 6554563734] 
+
+KEYWORDS = [
+    "nasheed", "nashida", "нашида", "maruza", "ma'ruza", "маруза",
+    "namoz", "намоз", "diniy muamo", "диний муаммо",
+    "mahalla", "маҳалла", "gaz", "газ", "svet", "свет", "elektr", "электр",
+    "xokimyat", "хокимят", "hokimiyat", "ҳокимият", 
+    "murojat", "мурожат", "murojaat", "мурожаат",
+    "suv", "сув", "suz"
+]
+
+# --- MA'LUMOTLAR BAZASI (SQLite) ---
+def init_db():
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS groups (chat_id INTEGER PRIMARY KEY)')
+    conn.commit()
+    conn.close()
+
+def add_group(chat_id):
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO groups (chat_id) VALUES (?)', (chat_id,))
+    conn.commit()
+    conn.close()
+
+def remove_group(chat_id):
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM groups WHERE chat_id = ?', (chat_id,))
+    conn.commit()
+    conn.close()
+
+def get_group_count():
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM groups')
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+init_db()
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
+
+# Render uchun server
+async def handle_render(request):
+    return web.Response(text="Bot To'liq Monitoring Rejimida! 🌟")
+
+async def start_server():
+    app = web.Application()
+    app.router.add_get("/", handle_render)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+# --- GURUHLARNI DOIMIY KUZATISH ---
+@dp.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=True))
+async def on_my_chat_member_update(event: ChatMemberUpdated):
+    chat_id = event.chat.id
+    if event.new_chat_member.status in ["member", "administrator"]:
+        add_group(chat_id)
+        for admin_id in ADMINS:
+            await bot.send_message(admin_id, f"➕ <b>Yangi guruhga qo'shildim:</b> {event.chat.title}")
+    elif event.new_chat_member.status in ["left", "kicked"]:
+        remove_group(chat_id)
+
+# --- ADMIN STATISTIKA ---
+@dp.message(Command("stats"))
+async def get_stats(message: types.Message):
+    if message.from_user.id in ADMINS:
+        count = get_group_count()
+        await message.answer(
+            f"📊 <b>BOTNING TO'LIQ STATISTIKASI</b>\n"
+            f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+            f"📢 Jami ulangan guruhlar: <b>{count} ta</b>\n"
+            f"👤 Mas'ul adminlar: <b>2 ta</b>\n"
+            f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯", 
+            parse_mode="HTML"
+        )
+
+# --- XABARLARNI FILTRLASH ---
+@dp.message(F.text)
+async def handle_messages(message: types.Message):
+    if message.chat.type in ['group', 'supergroup']:
+        add_group(message.chat.id) # Guruhni darhol bazaga qo'shish
+
+    text_lower = message.text.lower()
+    is_found = any(re.search(rf'\b{re.escape(word)}\b', text_lower) for word in KEYWORDS)
+
+    if is_found:
+        uzb_tz = pytz.timezone('Asia/Tashkent')
+        now = datetime.now(uzb_tz)
+        report = (
+            f"🔔 <b>YANGI MUROJAAT</b>\n"
+            f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+            f"👤 <b>Kimdan:</b> {message.from_user.full_name}\n"
+            f"📍 <b>Guruh:</b> <code>{message.chat.title}</code>\n"
+            f"📝 <b>Xabar:</b> <blockquote>{message.text}</blockquote>\n\n"
+            f"📅 {now.strftime('%d.%m.%Y')} | ⏰ {now.strftime('%H:%M')}\n"
+            f"🔢 Jami guruhlar: <b>{get_group_count()} ta</b>"
+        )
+
+        kb = [[types.InlineKeyboardButton(text="🔍 Xabarni ko'rish", url=f"https://t.me/c/{str(message.chat.id).replace('-100', '')}/{message.message_id}")]]
+        
+        for admin_id in ADMINS:
+            try: await bot.send_message(admin_id, report, parse_mode="HTML", reply_markup=types.InlineKeyboardMarkup(inline_keyboard=kb))
+            except: pass
+
+async def main():
+    await bot.delete_webhook(drop_pending_updates=True)
+    await asyncio.gather(start_server(), dp.start_polling(bot))
+
+if __name__ == "__main__":
+    asyncio.run(main())
